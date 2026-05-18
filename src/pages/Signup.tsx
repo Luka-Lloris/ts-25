@@ -19,7 +19,12 @@ export function Signup() {
   const onSubmit = async (data: AuthInput) => {
     setErr(null)
     setMsg(null)
-    const { error } = await supabase.auth.signUp(data)
+    const { error } = await supabase.auth.signUp({
+      ...data,
+      options: {
+        emailRedirectTo: `${window.location.origin}/ts-25/`
+      }
+    })
     if (error) {
       setErr(error.message)
       return
