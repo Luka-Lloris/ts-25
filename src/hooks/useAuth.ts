@@ -6,12 +6,13 @@ import type { Profile } from '../types'
 export function useAuth() {
   const [session, setSession] = useState<Session | null>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [sessionLoading, setSessionLoading] = useState(true)
+  const [profileLoading, setProfileLoading] = useState(true)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
       setSession(data.session)
-      setLoading(false)
+      setSessionLoading(false)
     })
 
     const { data: sub } = supabase.auth.onAuthStateChange((_event, sess) => {
@@ -22,17 +23,28 @@ export function useAuth() {
   }, [])
 
   useEffect(() => {
+    if (sessionLoading) return
     if (!session?.user) {
       setProfile(null)
+      setProfileLoading(false)
       return
     }
+    setProfileLoading(true)
     supabase
       .from('profiles')
       .select('*')
       .eq('id', session.user.id)
       .maybeSingle()
-      .then(({ data }) => setProfile((data as Profile) ?? null))
-  }, [session])
+      .then(({ data }) => {
+        setProfile((data as Profile) ?? null)
+        setProfileLoading(false)
+      })
+  }, [session, sessionLoading])
 
-  return { session, profile, loading, isAdmin: profile?.role === 'admin' }
+  return {
+    session,
+    profile,
+    loading: sessionLoading || profileLoading,
+    isAdmin: profile?.role === 'admin'
+  }
 }
