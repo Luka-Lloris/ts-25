@@ -22,7 +22,6 @@ import {
 export function AdminDashboard() {
   const [items, setItems] = useState<Request[]>([])
   const [loading, setLoading] = useState(true)
-  const [newCount, setNewCount] = useState(0)
 
   useEffect(() => {
     const load = async () => {
@@ -35,7 +34,7 @@ export function AdminDashboard() {
     }
     load()
 
-    // Realtime 구독: 신규 접수 발생 시 자동 갱신 + 알림 배지
+    // Realtime 구독: 신규 접수 발생 시 자동 갱신
     const channel = supabase
       .channel('requests-changes')
       .on(
@@ -43,7 +42,6 @@ export function AdminDashboard() {
         { event: 'INSERT', schema: 'public', table: 'requests' },
         (payload) => {
           setItems((prev) => [payload.new as Request, ...prev])
-          setNewCount((n) => n + 1)
         }
       )
       .on(
