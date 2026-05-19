@@ -113,14 +113,12 @@ export function AdminDashboard() {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold">어드민 대시보드</h1>
-        {newCount > 0 && (
-          <button
-            onClick={() => setNewCount(0)}
-            className="bg-red-500 text-white px-3 py-1 rounded text-xs font-bold animate-pulse"
-          >
-            신규 접수 {newCount}건
-          </button>
-        )}
+        <Link
+          to="/admin/verify"
+          className="bg-slate-700 text-white px-4 py-2 rounded text-sm font-medium hover:bg-slate-600"
+        >
+          DB 업데이트 확인
+        </Link>
       </div>
 
       {/* 상태별 카드 */}
