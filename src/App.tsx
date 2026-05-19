@@ -9,6 +9,7 @@ import { MyRequests } from './pages/MyRequests'
 import { RequestDetail } from './pages/RequestDetail'
 import { AdminDashboard } from './pages/AdminDashboard'
 import { AdminList } from './pages/AdminList'
+import { Verify } from './pages/Verify'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { session, loading } = useAuth()
@@ -81,6 +82,7 @@ export default function App() {
           }
         />
         <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="/verify" element={<Verify />} />
       </Routes>
     </Layout>
   )
