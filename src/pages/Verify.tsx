@@ -65,9 +65,9 @@ export function Verify() {
 
   return (
     <div className="bg-white p-6 rounded shadow-sm max-w-2xl mx-auto">
-      <h1 className="text-xl font-bold mb-2">DB 저장값 검증</h1>
+      <h1 className="text-xl font-bold mb-2">DB 업데이트 확인</h1>
       <p className="text-sm text-slate-600 mb-4">
-        FCr-1-G 기능 정확성 시험용 화면. 접수번호로 DB 저장값을 조회하여 입력값과 비교합니다.
+        접수번호로 DB 저장값을 조회합니다.
       </p>
 
       <form onSubmit={onSubmit} className="flex gap-2 mb-6">

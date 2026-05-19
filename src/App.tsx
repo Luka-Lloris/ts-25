@@ -66,6 +66,14 @@ export default function App() {
           }
         />
         <Route
+          path="/admin/verify"
+          element={
+            <AdminRoute>
+              <Verify />
+            </AdminRoute>
+          }
+        />
+        <Route
           path="/admin/list"
           element={
             <AdminRoute>
@@ -82,7 +90,6 @@ export default function App() {
           }
         />
         <Route path="*" element={<Navigate to="/" replace />} />
-        <Route path="/verify" element={<Verify />} />
       </Routes>
     </Layout>
   )
