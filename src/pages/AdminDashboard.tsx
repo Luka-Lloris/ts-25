@@ -115,7 +115,7 @@ export function AdminDashboard() {
           to="/admin/verify"
           className="bg-slate-700 text-white px-4 py-2 rounded text-sm font-medium hover:bg-slate-600"
         >
-          DB 업데이트 확인
+          DB 상세 조회
         </Link>
       </div>
 
