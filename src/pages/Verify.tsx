@@ -22,12 +22,22 @@ type VerifyRow = {
   updated_at: string
 }
 
+type PolicyRow = {
+  schemaname: string
+  tablename: string
+  policyname: string
+  cmd: string
+  policy_using: string | null
+  policy_with_check: string | null
+}
+
 export function Verify() {
   const [searchParams, setSearchParams] = useSearchParams()
   const [receiptNo, setReceiptNo] = useState(searchParams.get('receipt') ?? '')
   const [row, setRow] = useState<VerifyRow | null>(null)
   const [loading, setLoading] = useState(false)
   const [err, setErr] = useState<string | null>(null)
+  const [policies, setPolicies] = useState<PolicyRow[]>([])
 
   const fetchRow = async (no: string) => {
     if (!no.trim()) return
@@ -57,6 +67,15 @@ export function Verify() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  useEffect(() => {
+    supabase
+      .from('verify_policies')
+      .select('*')
+      .order('tablename')
+      .order('policyname')
+      .then(({ data }) => setPolicies((data as PolicyRow[]) ?? []))
+  }, [])
+
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     setSearchParams({ receipt: receiptNo })
@@ -64,10 +83,10 @@ export function Verify() {
   }
 
   return (
-    <div className="bg-white p-6 rounded shadow-sm max-w-2xl mx-auto">
+    <div className="bg-white p-6 rounded shadow-sm max-w-3xl mx-auto">
       <h1 className="text-xl font-bold mb-2">DB 업데이트 확인</h1>
       <p className="text-sm text-slate-600 mb-4">
-        접수번호로 DB 저장값을 조회합니다.
+        접수번호로 DB 저장값을 조회하고, 적용된 RLS 정책을 확인합니다.
       </p>
 
       <form onSubmit={onSubmit} className="flex gap-2 mb-6">
@@ -105,6 +124,39 @@ export function Verify() {
             <Row label="created_at" value={<span className="font-mono text-xs">{row.created_at}</span>} />
             <Row label="updated_at" value={<span className="font-mono text-xs">{row.updated_at}</span>} />
           </dl>
+        </div>
+      )}
+
+      {policies.length > 0 && (
+        <div className="mt-8 border-t pt-6">
+          <h2 className="text-sm font-bold mb-3 text-slate-700">RLS 정책 확인</h2>
+          <p className="text-xs text-slate-500 mb-3">
+            현재 public 스키마에 적용된 RLS 정책 전체 목록
+          </p>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead className="bg-slate-100">
+                <tr>
+                  <th className="text-left p-2">테이블</th>
+                  <th className="text-left p-2">정책명</th>
+                  <th className="text-left p-2">명령</th>
+                  <th className="text-left p-2">조건</th>
+                </tr>
+              </thead>
+              <tbody>
+                {policies.map((p, i) => (
+                  <tr key={i} className="border-t">
+                    <td className="p-2 font-mono">{p.tablename}</td>
+                    <td className="p-2">{p.policyname}</td>
+                    <td className="p-2">{p.cmd}</td>
+                    <td className="p-2 font-mono break-all">
+                      {p.policy_using || p.policy_with_check || '-'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>
