@@ -55,14 +55,22 @@ export function Verify() {
   const [searchParams, setSearchParams] = useSearchParams()
   const [tab, setTab] = useState<TabKey>('data')
 
+  // 탭 1: 접수 데이터
   const [receiptNo, setReceiptNo] = useState(searchParams.get('receipt') ?? '')
   const [row, setRow] = useState<VerifyRow | null>(null)
   const [dataLoading, setDataLoading] = useState(false)
   const [dataErr, setDataErr] = useState<string | null>(null)
 
+  // 탭 2~3: RLS 정보 (페이지 진입 시 자동 로드)
   const [rlsStatus, setRlsStatus] = useState<RlsStatusRow[]>([])
   const [policies, setPolicies] = useState<PolicyRow[]>([])
+
+  // 탭 4: 감사 로그
+  const [auditReceiptNo, setAuditReceiptNo] = useState('')
   const [audit, setAudit] = useState<AuditRow[]>([])
+  const [auditLoading, setAuditLoading] = useState(false)
+  const [auditErr, setAuditErr] = useState<string | null>(null)
+  const [auditSearched, setAuditSearched] = useState(false)
 
   const fetchRow = async (no: string) => {
     if (!no.trim()) return
@@ -86,6 +94,25 @@ export function Verify() {
     setRow(data as VerifyRow)
   }
 
+  const fetchAudit = async (no: string) => {
+    if (!no.trim()) return
+    setAuditLoading(true)
+    setAuditErr(null)
+    setAudit([])
+    const { data, error } = await supabase
+      .from('verify_audit_log')
+      .select('*')
+      .eq('receipt_no', no.trim())
+      .order('changed_at', { ascending: false })
+    setAuditLoading(false)
+    setAuditSearched(true)
+    if (error) {
+      setAuditErr(error.message)
+      return
+    }
+    setAudit((data as AuditRow[]) ?? [])
+  }
+
   useEffect(() => {
     const initial = searchParams.get('receipt')
     if (initial) fetchRow(initial)
@@ -105,19 +132,17 @@ export function Verify() {
       .order('tablename')
       .order('policyname')
       .then(({ data }) => setPolicies((data as PolicyRow[]) ?? []))
-
-    supabase
-      .from('verify_audit_log')
-      .select('*')
-      .order('changed_at', { ascending: false })
-      .limit(50)
-      .then(({ data }) => setAudit((data as AuditRow[]) ?? []))
   }, [])
 
-  const onSubmit = (e: React.FormEvent) => {
+  const onSubmitData = (e: React.FormEvent) => {
     e.preventDefault()
     setSearchParams({ receipt: receiptNo })
     fetchRow(receiptNo)
+  }
+
+  const onSubmitAudit = (e: React.FormEvent) => {
+    e.preventDefault()
+    fetchAudit(auditReceiptNo)
   }
 
   return (
@@ -144,7 +169,7 @@ export function Verify() {
 
       {tab === 'data' && (
         <div>
-          <form onSubmit={onSubmit} className="flex gap-2 mb-4">
+          <form onSubmit={onSubmitData} className="flex gap-2 mb-4">
             <input
               className={inputClass + ' flex-1'}
               placeholder="KAIC-YY-###"
@@ -256,63 +281,85 @@ export function Verify() {
       {tab === 'audit' && (
         <div>
           <p className="text-xs text-slate-500 mb-3">
-            데이터 변경 이력 최신 50건. INSERT/UPDATE/DELETE 시 자동 기록됩니다.
+            접수번호로 해당 신청 건의 변경 이력을 조회합니다.
           </p>
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs">
-              <thead className="bg-slate-100">
-                <tr>
-                  <th className="text-left p-2">시각</th>
-                  <th className="text-left p-2">접수번호</th>
-                  <th className="text-left p-2">동작</th>
-                  <th className="text-left p-2">변경 전</th>
-                  <th className="text-left p-2">변경 후</th>
-                </tr>
-              </thead>
-              <tbody>
-                {audit.map((a) => (
-                  <tr key={a.id} className="border-t align-top">
-                    <td className="p-2 font-mono whitespace-nowrap">
-                      {new Date(a.changed_at).toLocaleString()}
-                    </td>
-                    <td className="p-2 font-mono">{a.receipt_no ?? '-'}</td>
-                    <td className="p-2">
-                      <span
-                        className={
-                          'inline-block px-2 py-0.5 rounded text-xs ' +
-                          (a.action === 'INSERT'
-                            ? 'bg-green-100 text-green-800'
-                            : a.action === 'UPDATE'
-                              ? 'bg-amber-100 text-amber-800'
-                              : 'bg-red-100 text-red-800')
-                        }
-                      >
-                        {a.action}
-                      </span>
-                    </td>
-                    <td className="p-2 font-mono break-all max-w-xs">
-                      {a.before_data ? (
-                        <pre className="whitespace-pre-wrap text-[10px]">
-                          {JSON.stringify(a.before_data, null, 2)}
-                        </pre>
-                      ) : (
-                        '-'
-                      )}
-                    </td>
-                    <td className="p-2 font-mono break-all max-w-xs">
-                      {a.after_data ? (
-                        <pre className="whitespace-pre-wrap text-[10px]">
-                          {JSON.stringify(a.after_data, null, 2)}
-                        </pre>
-                      ) : (
-                        '-'
-                      )}
-                    </td>
+
+          <form onSubmit={onSubmitAudit} className="flex gap-2 mb-4">
+            <input
+              className={inputClass + ' flex-1'}
+              placeholder="KAIC-YY-###"
+              value={auditReceiptNo}
+              onChange={(e) => setAuditReceiptNo(e.target.value)}
+            />
+            <button type="submit" className={primaryBtnClass}>
+              조회
+            </button>
+          </form>
+
+          {auditLoading && <p className="text-slate-500">조회 중...</p>}
+          {auditErr && <p className="text-red-600 text-sm">{auditErr}</p>}
+
+          {auditSearched && !auditLoading && !auditErr && audit.length === 0 && (
+            <p className="text-slate-500 text-sm">해당 접수번호의 변경 이력이 없습니다.</p>
+          )}
+
+          {audit.length > 0 && (
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead className="bg-slate-100">
+                  <tr>
+                    <th className="text-left p-2">시각</th>
+                    <th className="text-left p-2">접수번호</th>
+                    <th className="text-left p-2">동작</th>
+                    <th className="text-left p-2">변경 전</th>
+                    <th className="text-left p-2">변경 후</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {audit.map((a) => (
+                    <tr key={a.id} className="border-t align-top">
+                      <td className="p-2 font-mono whitespace-nowrap">
+                        {new Date(a.changed_at).toLocaleString()}
+                      </td>
+                      <td className="p-2 font-mono">{a.receipt_no ?? '-'}</td>
+                      <td className="p-2">
+                        <span
+                          className={
+                            'inline-block px-2 py-0.5 rounded text-xs ' +
+                            (a.action === 'INSERT'
+                              ? 'bg-green-100 text-green-800'
+                              : a.action === 'UPDATE'
+                                ? 'bg-amber-100 text-amber-800'
+                                : 'bg-red-100 text-red-800')
+                          }
+                        >
+                          {a.action}
+                        </span>
+                      </td>
+                      <td className="p-2 font-mono break-all max-w-xs">
+                        {a.before_data ? (
+                          <pre className="whitespace-pre-wrap text-[10px]">
+                            {JSON.stringify(a.before_data, null, 2)}
+                          </pre>
+                        ) : (
+                          '-'
+                        )}
+                      </td>
+                      <td className="p-2 font-mono break-all max-w-xs">
+                        {a.after_data ? (
+                          <pre className="whitespace-pre-wrap text-[10px]">
+                            {JSON.stringify(a.after_data, null, 2)}
+                          </pre>
+                        ) : (
+                          '-'
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
     </div>
