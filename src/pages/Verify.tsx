@@ -41,6 +41,7 @@ type AuditRow = {
   id: string
   table_name: string
   record_id: string
+  receipt_no: string | null
   action: 'INSERT' | 'UPDATE' | 'DELETE'
   before_data: unknown
   after_data: unknown
@@ -121,7 +122,7 @@ export function Verify() {
 
   return (
     <div className="bg-white p-6 rounded shadow-sm max-w-4xl mx-auto">
-      <h1 className="text-xl font-bold mb-2">DB 업데이트 확인</h1>
+      <h1 className="text-xl font-bold mb-2">DB 상세 조회</h1>
       <p className="text-sm text-slate-600 mb-4">
         시험 검증용 페이지. 접수 데이터·RLS 상태·정책·감사 로그를 조회합니다.
       </p>
@@ -262,8 +263,7 @@ export function Verify() {
               <thead className="bg-slate-100">
                 <tr>
                   <th className="text-left p-2">시각</th>
-                  <th className="text-left p-2">테이블</th>
-                  <th className="text-left p-2">레코드 ID</th>
+                  <th className="text-left p-2">접수번호</th>
                   <th className="text-left p-2">동작</th>
                   <th className="text-left p-2">변경 전</th>
                   <th className="text-left p-2">변경 후</th>
@@ -275,8 +275,7 @@ export function Verify() {
                     <td className="p-2 font-mono whitespace-nowrap">
                       {new Date(a.changed_at).toLocaleString()}
                     </td>
-                    <td className="p-2 font-mono">{a.table_name}</td>
-                    <td className="p-2 font-mono break-all">{a.record_id}</td>
+                    <td className="p-2 font-mono">{a.receipt_no ?? '-'}</td>
                     <td className="p-2">
                       <span
                         className={
