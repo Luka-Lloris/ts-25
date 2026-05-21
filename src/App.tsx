@@ -10,6 +10,7 @@ import { RequestDetail } from './pages/RequestDetail'
 import { AdminDashboard } from './pages/AdminDashboard'
 import { AdminList } from './pages/AdminList'
 import { Verify } from './pages/Verify'
+import { LMGuide } from './pages/LMGuide'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { session, loading } = useAuth()
@@ -78,6 +79,14 @@ export default function App() {
           element={
             <AdminRoute>
               <AdminList />
+            </AdminRoute>
+          }
+        />
+        <Route
+          path="/admin/console/lm_guide"
+          element={
+            <AdminRoute>
+              <LMGuide />
             </AdminRoute>
           }
         />
