@@ -22,6 +22,12 @@ type VerifyRow = {
   updated_at: string
 }
 
+type RlsStatusRow = {
+  schemaname: string
+  tablename: string
+  rls_enabled: boolean
+}
+
 type PolicyRow = {
   schemaname: string
   tablename: string
@@ -31,31 +37,49 @@ type PolicyRow = {
   policy_with_check: string | null
 }
 
+type AuditRow = {
+  id: string
+  table_name: string
+  record_id: string
+  action: 'INSERT' | 'UPDATE' | 'DELETE'
+  before_data: unknown
+  after_data: unknown
+  changed_by: string | null
+  changed_at: string
+}
+
+type TabKey = 'data' | 'rls' | 'policy' | 'audit'
+
 export function Verify() {
   const [searchParams, setSearchParams] = useSearchParams()
+  const [tab, setTab] = useState<TabKey>('data')
+
   const [receiptNo, setReceiptNo] = useState(searchParams.get('receipt') ?? '')
   const [row, setRow] = useState<VerifyRow | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [err, setErr] = useState<string | null>(null)
+  const [dataLoading, setDataLoading] = useState(false)
+  const [dataErr, setDataErr] = useState<string | null>(null)
+
+  const [rlsStatus, setRlsStatus] = useState<RlsStatusRow[]>([])
   const [policies, setPolicies] = useState<PolicyRow[]>([])
+  const [audit, setAudit] = useState<AuditRow[]>([])
 
   const fetchRow = async (no: string) => {
     if (!no.trim()) return
-    setLoading(true)
-    setErr(null)
+    setDataLoading(true)
+    setDataErr(null)
     setRow(null)
     const { data, error } = await supabase
       .from('verify_requests')
       .select('*')
       .eq('receipt_no', no.trim())
       .maybeSingle()
-    setLoading(false)
+    setDataLoading(false)
     if (error) {
-      setErr(error.message)
+      setDataErr(error.message)
       return
     }
     if (!data) {
-      setErr('해당 접수번호의 데이터가 없습니다.')
+      setDataErr('해당 접수번호의 데이터가 없습니다.')
       return
     }
     setRow(data as VerifyRow)
@@ -69,11 +93,24 @@ export function Verify() {
 
   useEffect(() => {
     supabase
+      .from('verify_rls_status')
+      .select('*')
+      .order('tablename')
+      .then(({ data }) => setRlsStatus((data as RlsStatusRow[]) ?? []))
+
+    supabase
       .from('verify_policies')
       .select('*')
       .order('tablename')
       .order('policyname')
       .then(({ data }) => setPolicies((data as PolicyRow[]) ?? []))
+
+    supabase
+      .from('verify_audit_log')
+      .select('*')
+      .order('changed_at', { ascending: false })
+      .limit(50)
+      .then(({ data }) => setAudit((data as AuditRow[]) ?? []))
   }, [])
 
   const onSubmit = (e: React.FormEvent) => {
@@ -83,55 +120,110 @@ export function Verify() {
   }
 
   return (
-    <div className="bg-white p-6 rounded shadow-sm max-w-3xl mx-auto">
+    <div className="bg-white p-6 rounded shadow-sm max-w-4xl mx-auto">
       <h1 className="text-xl font-bold mb-2">DB 업데이트 확인</h1>
       <p className="text-sm text-slate-600 mb-4">
-        접수번호로 DB 저장값을 조회하고, 적용된 RLS 정책을 확인합니다.
+        시험 검증용 페이지. 접수 데이터·RLS 상태·정책·감사 로그를 조회합니다.
       </p>
 
-      <form onSubmit={onSubmit} className="flex gap-2 mb-6">
-        <input
-          className={inputClass + ' flex-1'}
-          placeholder="KAIC-YY-###"
-          value={receiptNo}
-          onChange={(e) => setReceiptNo(e.target.value)}
-        />
-        <button type="submit" className={primaryBtnClass}>
-          조회
-        </button>
-      </form>
+      <div className="flex gap-1 border-b mb-4">
+        <TabButton active={tab === 'data'} onClick={() => setTab('data')}>
+          접수 데이터
+        </TabButton>
+        <TabButton active={tab === 'rls'} onClick={() => setTab('rls')}>
+          RLS 상태
+        </TabButton>
+        <TabButton active={tab === 'policy'} onClick={() => setTab('policy')}>
+          RLS 정책
+        </TabButton>
+        <TabButton active={tab === 'audit'} onClick={() => setTab('audit')}>
+          감사 로그
+        </TabButton>
+      </div>
 
-      {loading && <p className="text-slate-500">조회 중...</p>}
-      {err && <p className="text-red-600 text-sm">{err}</p>}
+      {tab === 'data' && (
+        <div>
+          <form onSubmit={onSubmit} className="flex gap-2 mb-4">
+            <input
+              className={inputClass + ' flex-1'}
+              placeholder="KAIC-YY-###"
+              value={receiptNo}
+              onChange={(e) => setReceiptNo(e.target.value)}
+            />
+            <button type="submit" className={primaryBtnClass}>
+              조회
+            </button>
+          </form>
 
-      {row && (
-        <div className="border rounded p-4 bg-slate-50">
-          <h2 className="text-sm font-bold mb-3 text-slate-700">DB 저장값</h2>
-          <dl className="text-sm space-y-1">
-            <Row label="접수번호" value={<span className="font-mono">{row.receipt_no}</span>} />
-            <Row label="레코드 ID" value={<span className="font-mono text-xs">{row.id}</span>} />
-            <Row label="user_id" value={<span className="font-mono text-xs">{row.user_id}</span>} />
-            <Row label="의뢰 종류" value={`${row.request_type} (${REQUEST_TYPE_LABEL[row.request_type]})`} />
-            <Row label="기관명" value={row.org_name} />
-            <Row label="담당자명" value={row.manager_name} />
-            <Row label="연락처" value={row.manager_phone} />
-            <Row label="담당자 이메일" value={row.manager_email} />
-            <Row label="제목" value={row.title} />
-            <Row label="내용" value={<pre className="whitespace-pre-wrap font-sans">{row.description}</pre>} />
-            <Row label="희망 시작일" value={row.desired_start} />
-            <Row label="희망 종료일" value={row.desired_end} />
-            <Row label="상태" value={`${row.status} (${REQUEST_STATUS_LABEL[row.status]})`} />
-            <Row label="created_at" value={<span className="font-mono text-xs">{row.created_at}</span>} />
-            <Row label="updated_at" value={<span className="font-mono text-xs">{row.updated_at}</span>} />
-          </dl>
+          {dataLoading && <p className="text-slate-500">조회 중...</p>}
+          {dataErr && <p className="text-red-600 text-sm">{dataErr}</p>}
+
+          {row && (
+            <div className="border rounded p-4 bg-slate-50">
+              <h2 className="text-sm font-bold mb-3 text-slate-700">DB 저장값</h2>
+              <dl className="text-sm space-y-1">
+                <Row label="접수번호" value={<span className="font-mono">{row.receipt_no}</span>} />
+                <Row label="레코드 ID" value={<span className="font-mono text-xs">{row.id}</span>} />
+                <Row label="user_id" value={<span className="font-mono text-xs">{row.user_id}</span>} />
+                <Row label="의뢰 종류" value={`${row.request_type} (${REQUEST_TYPE_LABEL[row.request_type]})`} />
+                <Row label="기관명" value={row.org_name} />
+                <Row label="담당자명" value={row.manager_name} />
+                <Row label="연락처" value={row.manager_phone} />
+                <Row label="담당자 이메일" value={row.manager_email} />
+                <Row label="제목" value={row.title} />
+                <Row label="내용" value={<pre className="whitespace-pre-wrap font-sans">{row.description}</pre>} />
+                <Row label="희망 시작일" value={row.desired_start} />
+                <Row label="희망 종료일" value={row.desired_end} />
+                <Row label="상태" value={`${row.status} (${REQUEST_STATUS_LABEL[row.status]})`} />
+                <Row label="created_at" value={<span className="font-mono text-xs">{row.created_at}</span>} />
+                <Row label="updated_at" value={<span className="font-mono text-xs">{row.updated_at}</span>} />
+              </dl>
+            </div>
+          )}
         </div>
       )}
 
-      {policies.length > 0 && (
-        <div className="mt-8 border-t pt-6">
-          <h2 className="text-sm font-bold mb-3 text-slate-700">RLS 정책 확인</h2>
+      {tab === 'rls' && (
+        <div>
           <p className="text-xs text-slate-500 mb-3">
-            현재 public 스키마에 적용된 RLS 정책 전체 목록
+            public 스키마의 각 테이블에 RLS(Row Level Security)가 활성화되어 있는지 확인합니다.
+          </p>
+          <table className="w-full text-sm">
+            <thead className="bg-slate-100">
+              <tr>
+                <th className="text-left p-2">스키마</th>
+                <th className="text-left p-2">테이블</th>
+                <th className="text-left p-2">RLS 활성</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rlsStatus.map((r, i) => (
+                <tr key={i} className="border-t">
+                  <td className="p-2 font-mono">{r.schemaname}</td>
+                  <td className="p-2 font-mono">{r.tablename}</td>
+                  <td className="p-2">
+                    <span
+                      className={
+                        'inline-block px-2 py-0.5 rounded text-xs ' +
+                        (r.rls_enabled
+                          ? 'bg-green-100 text-green-800'
+                          : 'bg-red-100 text-red-800')
+                      }
+                    >
+                      {r.rls_enabled ? 'true' : 'false'}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {tab === 'policy' && (
+        <div>
+          <p className="text-xs text-slate-500 mb-3">
+            현재 public 스키마에 적용된 RLS 정책 전체 목록입니다.
           </p>
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
@@ -159,7 +251,96 @@ export function Verify() {
           </div>
         </div>
       )}
+
+      {tab === 'audit' && (
+        <div>
+          <p className="text-xs text-slate-500 mb-3">
+            데이터 변경 이력 최신 50건. INSERT/UPDATE/DELETE 시 자동 기록됩니다.
+          </p>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead className="bg-slate-100">
+                <tr>
+                  <th className="text-left p-2">시각</th>
+                  <th className="text-left p-2">테이블</th>
+                  <th className="text-left p-2">레코드 ID</th>
+                  <th className="text-left p-2">동작</th>
+                  <th className="text-left p-2">변경 전</th>
+                  <th className="text-left p-2">변경 후</th>
+                </tr>
+              </thead>
+              <tbody>
+                {audit.map((a) => (
+                  <tr key={a.id} className="border-t align-top">
+                    <td className="p-2 font-mono whitespace-nowrap">
+                      {new Date(a.changed_at).toLocaleString()}
+                    </td>
+                    <td className="p-2 font-mono">{a.table_name}</td>
+                    <td className="p-2 font-mono break-all">{a.record_id}</td>
+                    <td className="p-2">
+                      <span
+                        className={
+                          'inline-block px-2 py-0.5 rounded text-xs ' +
+                          (a.action === 'INSERT'
+                            ? 'bg-green-100 text-green-800'
+                            : a.action === 'UPDATE'
+                              ? 'bg-amber-100 text-amber-800'
+                              : 'bg-red-100 text-red-800')
+                        }
+                      >
+                        {a.action}
+                      </span>
+                    </td>
+                    <td className="p-2 font-mono break-all max-w-xs">
+                      {a.before_data ? (
+                        <pre className="whitespace-pre-wrap text-[10px]">
+                          {JSON.stringify(a.before_data, null, 2)}
+                        </pre>
+                      ) : (
+                        '-'
+                      )}
+                    </td>
+                    <td className="p-2 font-mono break-all max-w-xs">
+                      {a.after_data ? (
+                        <pre className="whitespace-pre-wrap text-[10px]">
+                          {JSON.stringify(a.after_data, null, 2)}
+                        </pre>
+                      ) : (
+                        '-'
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
+  )
+}
+
+function TabButton({
+  active,
+  onClick,
+  children
+}: {
+  active: boolean
+  onClick: () => void
+  children: React.ReactNode
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={
+        'px-4 py-2 text-sm font-medium -mb-px border-b-2 ' +
+        (active
+          ? 'border-slate-900 text-slate-900'
+          : 'border-transparent text-slate-500 hover:text-slate-700')
+      }
+    >
+      {children}
+    </button>
   )
 }
 
